@@ -1,4 +1,4 @@
-# Kin merge-trust benchmark — specification & verifier
+# Kin merge-trust benchmark: specification and verifier
 
 This repository is the **public, reimplementable specification** of Kin's merge-trust
 review benchmark, together with a **standalone, dependency-free verifier** for the sealed
@@ -13,15 +13,16 @@ variable. See [`SPEC.md`](SPEC.md) for the full protocol.
 
 | File | What it is |
 |---|---|
-| [`SPEC.md`](SPEC.md) | The pre-registered protocol (prereg v1): hashing primitives, scenario and gold schema, arm contracts, determinism gate, block-seal mechanism, scorer, and paired-statistics protocol — written so a stranger can build a compatible harness. Carries no result figures. |
-| [`verify_bundle.py`](verify_bundle.py) | A standalone verifier for a sealed evidence bundle. Python standard library only — no Kin, no daemon, no network, no third-party packages. |
+| [`SPEC.md`](SPEC.md) | The pre-registered protocol (prereg v1): hashing primitives, scenario and gold schema, arm contracts, determinism gate, block-seal mechanism, scorer, and paired-statistics protocol -- written so a stranger can build a compatible harness. Carries no result figures. |
+| [`verify_bundle.py`](verify_bundle.py) | A standalone verifier for a sealed evidence bundle. Python standard library only -- no Kin, no daemon, no network, no third-party packages. |
 | [`TRANSPARENCY.md`](TRANSPARENCY.md) | Why the specification and verifier are open while the runner and proof infrastructure stay private for now, and how the two relate. |
-| [`LICENSE`](LICENSE) | License for this specification and verifier. |
+| [`LICENSE`](LICENSE) | Apache License 2.0, the license for this specification and verifier. |
+| [`NOTICE`](NOTICE) | Copyright and attribution notice (Apache-2.0 Section 4(d)). |
 
 ## What is *not* here
 
-The **runner and proof infrastructure** — the orchestration, the pinned-release proof
-gate, and the hosted measurement environment — are proprietary and are not part of this
+The **runner and proof infrastructure** -- the orchestration, the pinned-release proof
+gate, and the hosted measurement environment -- are proprietary and are not part of this
 repository. This surface is the spec and the verifier; the runner opens later, if at all.
 See [`TRANSPARENCY.md`](TRANSPARENCY.md).
 
@@ -48,7 +49,7 @@ python3 verify_bundle.py path/to/bundle/ --json
 
 The verifier is deliberately conservative. It recomputes every digest that is checkable
 from the bundle alone (the segment-ledger content digest, the harness-source-manifest
-digest, and — when the dataset is supplied — both dataset digests), checks internal
+digest, and -- when the dataset is supplied -- both dataset digests), checks internal
 consistency (counts agree across files, the determinism block is coherent, the
 confusion-matrix arithmetic reproduces the declared metrics, and the per-arm decisions
 reconcile with the score block without any hidden label), and reports anything it cannot
@@ -59,6 +60,6 @@ non-zero exit code.
 
 A bundle names its declared actors with content-addressed identifiers, and a rerun of the
 same inputs is reproducible down to the byte. The verifier confirms that a bundle is an
-internally consistent, self-checking record of whatever run produced it — it does not
+internally consistent, self-checking record of whatever run produced it -- it does not
 re-execute the substrate. Describe results in those terms: declared actors,
 content-addressed identifiers, and reproducible reruns.

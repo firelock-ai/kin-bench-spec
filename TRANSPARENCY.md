@@ -1,4 +1,7 @@
-# Kin benchmark transparency posture -- DRAFT
+# Kin benchmark transparency posture
+
+Status: v1.0 -- 2026-07-23. Protocol frozen; results published separately upon
+independent verification.
 
 ## Statement
 

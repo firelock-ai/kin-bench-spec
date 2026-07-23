@@ -1,16 +1,16 @@
-# Kin merge-trust benchmark specification (prereg v1) -- DRAFT
+# Kin merge-trust benchmark specification (prereg v1)
 
-Status: internal draft, derived from harness source, not yet released.
+Status: v1.0 -- 2026-07-23. Protocol frozen; results published separately upon
+independent verification.
 Scope: the merge-trust adapter of the Kin benchmark harness (kin-bench), protocol
 identifier `merge-trust-prereg-v1`.
-Method note: every claim below was read from the harness source at
-`adapters/merge-trust/` (modules `dataset_identity.py`, `extract_scenarios.py`,
-`harness/run_prereg.py`, `harness/arm_k.py`, `harness/arm_g.py`, `harness/arm_l.py`,
-`harness/canonicalize.py`, `harness/score.py`, `harness/stats.py`, `harness/hygiene.py`)
-and cross-checked against a real accepted evidence bundle. Items that could not be
-pinned from code are marked `[NEEDS-CONFIRM]`. This document deliberately carries no
-measured result figures; it describes the mechanism and the protocol constants a
-stranger needs to reimplement the benchmark, not any run's outcome.
+Method note: every claim below was read directly from the reference implementation
+of the merge-trust harness -- its dataset-identity, scenario-extraction, arm,
+canonicalization, scoring, statistics, and hygiene modules -- and cross-checked
+against a real accepted evidence bundle. Items that could not be pinned from the
+source are marked `[NEEDS-CONFIRM]`. This document deliberately carries no measured
+result figures; it describes the mechanism and the protocol constants a stranger
+needs to reimplement the benchmark, not any run's outcome.
 
 Brand note for any later outward-facing derivative: describe declared actors,
 content-addressed identifiers, and reproducible reruns. Do not describe any output
@@ -57,9 +57,9 @@ def canonical_digest(obj):
     return sha256(text.encode("utf-8")).hexdigest()
 ```
 
-Compact separators, keys sorted at every depth, non-ASCII escaped. (In the source
-this is `run_prereg._canonical_digest`, `run_prereg._identity_digest`,
-`arm_k._canonical_sha256`, all wrapping `hygiene.sha256_text`.)
+Compact separators, keys sorted at every depth, non-ASCII escaped. In the reference
+implementation this is the single canonical-digest primitive that the run driver and
+each arm wrap for every seal, identity, and ledger digest.
 
 ### 2.2 Determinism / report digest
 

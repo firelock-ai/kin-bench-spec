@@ -18,9 +18,9 @@ It is deliberately conservative: anything it cannot recompute from the bundle is
 reported as an explicit "declared (not recomputable from bundle)" note rather than
 being trusted silently. A single FAIL sets the process exit code to 1.
 
-Digest definitions are transcribed from the merge-trust harness source
-(dataset_identity.py, harness/canonicalize.py, harness/score.py, harness/stats.py,
-harness/run_prereg.py) and confirmed against a real accepted bundle.
+Digest definitions are transcribed from the merge-trust reference implementation
+(its dataset-identity, canonicalization, scoring, statistics, and run-driver
+modules) and confirmed against a real accepted bundle.
 """
 from __future__ import annotations
 
@@ -42,9 +42,9 @@ TOL = 1e-9  # float tolerance for recomputed metrics
 
 # ----------------------------------------------------------------------------- digests
 def canonical_digest(obj: Any) -> str:
-    """run_prereg._canonical_digest: sha256 over compact, key-sorted, ascii JSON.
+    """Canonical digest: sha256 over compact, key-sorted, ascii JSON.
 
-    hygiene.sha256_text(json.dumps(obj, sort_keys=True, separators=(",",":"),
+    sha256(json.dumps(obj, sort_keys=True, separators=(",",":"),
     ensure_ascii=True)).  Used for the segment-ledger content_sha256 and the
     harness-source-manifest content_sha256.
     """
@@ -53,7 +53,7 @@ def canonical_digest(obj: Any) -> str:
 
 
 def dataset_records_digest(records: list) -> str:
-    """dataset_identity.dataset_sha256: sha256 over json.dumps(records, sort_keys=True).
+    """Dataset records digest: sha256 over json.dumps(records, sort_keys=True).
 
     NOTE: default separators (", ", ": ") -- NOT the compact form used by
     canonical_digest -- and order-sensitive over the record list.
@@ -62,7 +62,7 @@ def dataset_records_digest(records: list) -> str:
 
 
 def is_canonical_sha256(value: object) -> bool:
-    """run_prereg._is_canonical_sha256: 64 lowercase hex chars."""
+    """Canonical sha256 form: 64 lowercase hex chars."""
     return bool(
         isinstance(value, str)
         and len(value) == 64

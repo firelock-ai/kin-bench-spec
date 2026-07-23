@@ -1,0 +1,9 @@
+Kin merge-trust benchmark: specification and verifier
+Copyright 2026 Firelock, LLC
+
+Licensed under the Apache License, Version 2.0 (the "License").
+See the LICENSE file for the specific language governing permissions
+and limitations under the License.
+
+The verifier (verify_bundle.py) depends only on the Python standard
+library and includes no third-party components.
