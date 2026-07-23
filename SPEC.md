@@ -7,8 +7,9 @@ identifier `merge-trust-prereg-v1`.
 Method note: every claim below was read directly from the reference implementation
 of the merge-trust harness -- its dataset-identity, scenario-extraction, arm,
 canonicalization, scoring, statistics, and hygiene modules -- and cross-checked
-against a real accepted evidence bundle. Items that could not be pinned from the
-source are marked `[NEEDS-CONFIRM]`. This document deliberately carries no measured
+against a real accepted evidence bundle. Details that were open at v1.0 have since
+been confirmed against the reference implementation (section 14). This document
+deliberately carries no measured
 result figures; it describes the mechanism and the protocol constants a stranger
 needs to reimplement the benchmark, not any run's outcome.
 
