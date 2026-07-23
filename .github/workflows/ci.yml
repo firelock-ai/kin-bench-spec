@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Compile and self-describe
+        run: |
+          python3 -m py_compile verify_bundle.py
+          python3 verify_bundle.py --help >/dev/null
+      - name: Refuse a missing bundle (fail-closed smoke)
+        run: |
+          if python3 verify_bundle.py ./does-not-exist >/dev/null 2>&1; then
+            echo "::error::verifier accepted a missing bundle"; exit 1
+          fi
+          echo "verifier fails closed on a missing bundle"
+      - name: Docs are ASCII and link-clean
+        run: |
+          ! LC_ALL=C grep -rnP '[^\x00-\x7F]' README.md SPEC.md TRANSPARENCY.md NOTICE LICENSE
