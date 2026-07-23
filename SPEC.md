@@ -1,7 +1,7 @@
 # Kin merge-trust benchmark specification (prereg v1)
 
-Status: v1.0 -- 2026-07-23. Protocol frozen; results published separately upon
-independent verification.
+Status: v1.0.1 -- 2026-07-23. Protocol frozen; section 14 items confirmed against the
+reference implementation. Results published separately upon independent verification.
 Scope: the merge-trust adapter of the Kin benchmark harness (kin-bench), protocol
 identifier `merge-trust-prereg-v1`.
 Method note: every claim below was read directly from the reference implementation
@@ -158,9 +158,12 @@ re-asserts that identity before running, before scoring, and inside the provenan
 gate. `raw_file_sha256` and `records_array_sha256` are passed through from the dataset
 sidecar rather than recomputed by the runner.
 
-`[NEEDS-CONFIRM]`: older dataset sidecars written before the dual-digest change carry
-only `sha256`; `raw_file_sha256` and `records_array_sha256` are absent. A verifier must
-treat `raw_file_sha256` as optional.
+Older dataset sidecars written before the dual-digest change carry only `sha256`;
+`raw_file_sha256` and `records_array_sha256` are absent, and the runner carries those two
+fields through as null rather than recomputing them. A verifier must treat
+`raw_file_sha256` (and the `records_array_sha256` alias) as optional; dataset identity is
+still enforced on every run through `dataset.sha256`, the records-array digest, which the
+runner recomputes from the loaded records and refuses on mismatch.
 
 ---
 
@@ -335,10 +338,11 @@ prep regime, the scenario identifiers, and a cleanup terminator scenario. A mid-
 mutation trips the graph-root binding for the mutating scenario and every scenario
 after it, so cross-scenario contamination surfaces rather than hiding.
 
-`[NEEDS-CONFIRM]`: the exact field membership of the per-arm `arm_identity` object
-(especially the Arm K daemon runtime-identity fields) that is hashed, together with the
-common identity, into each ledger `identity_sha256`. The common-identity object is
-enumerated in section 11.3; the arm-identity object was read only partially.
+The per-arm `arm_identity` object hashed, together with the common identity, into each
+ledger `identity_sha256` is enumerated in section 14. For Arm K it attests the Kin CLI
+and daemon binary pins, their self-reported build identifiers, and the daemon
+behavior-environment; for Arm G it is empty; for Arm L it is the model-configuration and
+served-model runtime identities. The common-identity object is enumerated in section 11.3.
 
 ---
 
@@ -562,9 +566,11 @@ command bindings) and an artifacts manifest (schema `kin.merge-trust-arm-artifac
 digest. Full replication of a bundle checks these too; the standalone verifier that
 ships with this spec checks the four top-level files and the ledger they reference.
 
-`[NEEDS-CONFIRM]`: the exact input to `artifact_set_sha256` (the arm-artifacts manifest
-digest) was read only at the schema level, not byte-pinned. A full-tree replicator
-should confirm it against a real per-scenario stamp before asserting a recompute.
+The input to `artifact_set_sha256` (the arm-artifacts manifest digest) is the identity
+digest (section 2.1) of the manifest's path-sorted `{path, size, sha256}` file-entry list
+alone, as detailed in section 14; the schema tag and the digest field itself are excluded.
+Full per-scenario stamp verification still requires the per-scenario tree, not just the
+four-file bundle.
 
 ---
 
@@ -619,16 +625,50 @@ A stranger reimplementing merge-trust prereg v1 must:
 
 ---
 
-## 14. Open items to confirm before release
+## 14. Protocol details confirmed against the reference implementation
 
-- `[NEEDS-CONFIRM]` exact `arm_identity` field membership (Arm K daemon runtime-identity
-  fields) feeding each ledger `identity_sha256` (section 7.6, 11.3).
-- `[NEEDS-CONFIRM]` exact byte input to `artifact_set_sha256` in the arm-artifacts
-  manifest (section 11.5).
-- `[NEEDS-CONFIRM]` full membership of the per-arm v2 stamp object hashed into
-  `stamp_payload_sha256`, and the precise relationship between that payload digest and
-  the ledger's `stamp_sha256` (the ledger's `stamp_sha256` is the file digest of the
-  on-disk stamp, which itself contains the payload digest); full per-scenario stamp
-  verification requires the per-scenario tree, not just the four-file bundle.
-- Confirm the older-sidecar dataset-identity fallback (section 4) against the intended
-  public dataset before any external replication.
+These were the last open protocol details at v1.0. Each has now been read directly from
+the reference implementation and is stated here as a confirmed part of the protocol. This
+section carries no measured result figures, only mechanism.
+
+- Ledger `identity_sha256` is the identity digest (section 2.1) of `{common, arm}`, where
+  `common` is the common-identity object of section 11.3 and `arm` is a per-arm identity
+  object. For Arm K that per-arm object attests the Kin runtime that produced the pass:
+  the Kin CLI binary pin (its path and file digest), the configured Kin daemon binary pin
+  (its path and file digest), the daemon's and the CLI's self-reported build identifiers
+  read back from the running graph, and the daemon behavior-environment captured at
+  bootstrap (the cold-cache and embedding pins that determine how it answers). For Arm G
+  the object is empty -- the deterministic text arm attests no runtime. For Arm L it is
+  the resolved model-configuration identity together with the attested served-model
+  runtime identity.
+- `artifact_set_sha256` in the arm-artifacts manifest is the identity digest (section
+  2.1) of the manifest's file-entry list alone: the path-sorted array of one `{path,
+  size, sha256}` object per sealed artifact, where `path` is the arm-directory-relative
+  filename, `size` is its byte length, and `sha256` is the file digest (section 2.4) of
+  that artifact. The manifest's schema tag and the `artifact_set_sha256` field itself are
+  not part of the hashed input, and the verifier recomputes the digest over the entry
+  list to check it.
+- `stamp_payload_sha256` is the identity digest (section 2.1) of the entire per-arm v2
+  stamp object -- its schema tag, stamp mode and attribution, the protocol and harness
+  commit, the run and segment identifiers, the produced/written/recorded timestamps, the
+  scenario id and arm, the binary set and its per-binary digests, the command,
+  environment, harness-source manifest, source-control block, model runtime,
+  runtime-identity attestation, hygiene block, platform, and dataset block and digest,
+  plus the embedded artifacts manifest -- with only the `stamp_payload_sha256` field
+  itself excluded, because it is computed before being inserted. The stamp is then
+  persisted with that payload digest embedded, and the ledger's `stamp_sha256` is the file
+  digest (section 2.4) of the persisted stamp bytes. The two digests therefore nest: the
+  payload digest binds the stamp's canonical content independent of serialization, and the
+  file digest binds the exact bytes handed out, which already contain the payload digest.
+  Full per-scenario stamp verification requires the per-scenario tree, not just the
+  four-file bundle.
+- The older-sidecar dataset-identity fallback (section 4) is a backward-compatibility
+  path, not a gap. The run driver recomputes the records-array digest (section 2.3) from
+  the loaded records and refuses the run unless it equals the sidecar's declared primary
+  digest (`dataset.sha256`); the raw-file and explicit records-array digests are carried
+  through from the sidecar unmodified and are absent on sidecars written before the
+  dual-digest convention. A verifier must therefore treat `raw_file_sha256` (and the
+  `records_array_sha256` alias) as optional, while dataset identity stays fully enforced
+  through the primary digest regardless of sidecar vintage. The reference datasets that
+  ship with the harness currently carry only the primary digest, so an external
+  replicator should expect these optional fields to be absent.
