@@ -30,6 +30,11 @@ This repository also carries **no measured result figures**. It describes the me
 and the protocol constants a stranger needs to reimplement or check the benchmark, not any
 run's outcome.
 
+Materials that cite Kin's **Multi-SWE-Bench determinism study** are citing a different
+benchmark from the one specified here. That study's protocol, figures, and evidence
+artifacts live at [firelock.ai/labs/kin-proof](https://firelock.ai/labs/kin-proof); this
+repository neither specifies nor scores it.
+
 ## Verifying a sealed evidence bundle
 
 The verifier reads the four top-level files of a bundle
