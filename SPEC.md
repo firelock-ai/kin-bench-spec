@@ -1,16 +1,16 @@
 # Kin merge-trust benchmark specification (prereg v1)
 
-Status: v1.0.1 -- 2026-07-23. Protocol frozen; section 14 items confirmed against the
+Status: v1.0.1, 2026-07-23. Protocol frozen; section 14 items confirmed against the
 reference implementation. Results published separately upon independent verification.
 Scope: the merge-trust adapter of the Kin benchmark harness (kin-bench), protocol
 identifier `merge-trust-prereg-v1`.
-Method note: every claim below was read directly from the reference implementation
-of the merge-trust harness -- its dataset-identity, scenario-extraction, arm,
-canonicalization, scoring, statistics, and hygiene modules -- and cross-checked
-against a real accepted evidence bundle. Details that were open at v1.0 have since
-been confirmed against the reference implementation (section 14). This document
-deliberately carries no measured
-result figures; it describes the mechanism and the protocol constants a stranger
+
+Method note: every claim below was read directly from the reference implementation of the
+merge-trust harness, meaning its dataset-identity, scenario-extraction, arm,
+canonicalization, scoring, statistics, and hygiene modules, and cross-checked against a
+real accepted evidence bundle. Details that were open at v1.0 have since been confirmed
+against the reference implementation (section 14). This document deliberately carries no
+measured result figures. It describes the mechanism and the protocol constants a stranger
 needs to reimplement the benchmark, not any run's outcome.
 
 Brand note for any later outward-facing derivative: describe declared actors,
@@ -27,7 +27,7 @@ open-source repository. Every arm is a different reviewer answering the same
 question: if this change were merged, should it be trusted, and what else would it
 impact?
 
-The experiment isolates one variable -- the substrate the reviewer reasons over:
+The experiment isolates one variable, the substrate the reviewer reasons over:
 
 - Arm K (the system under test) answers from Kin's semantic graph.
 - Arm G (the primary baseline) answers from a deterministic text-only rule.
@@ -243,8 +243,8 @@ of non-semantic variation and compares everything else verbatim:
   inside every string leaf, so the hash is a property of report content, not its
   location.
 
-Any other cross-pass difference -- a change in verdict, blast radius, findings, entity
-set, or review mutations -- is a real varying failure and voids citability.
+Any other cross-pass difference is a real varying failure and voids citability: a change
+in verdict, blast radius, findings, entity set, or review mutations.
 
 The gate evaluates `bit_identical` over the pass hashes: true only when more than one
 pass is present and every pass hashes to the same value. A single pass can never
@@ -275,8 +275,8 @@ bundle that carries a block record without claiming the regime is rejected.
 ### 7.1 Graph state and the authoritative invariant
 
 The graph state captured for a repository is `{content_sha256, graph_root_hash,
-graph_generation}`. Of these, only `graph_root_hash` -- the daemon's entity Merkle
-root -- is the semantic-authority invariant asserted across a measured command. The
+graph_generation}`. Of these, only `graph_root_hash`, the daemon's entity Merkle
+root, is the semantic-authority invariant asserted across a measured command. The
 content digest and the generation counter legitimately move as the embedding worker
 writes derived-index snapshots; asserting them would produce false alarms. The graph
 root is fetched only when the graph identity reports itself consistent (valid, no
@@ -293,8 +293,8 @@ graph catalog (section 7.4).
 
 ### 7.3 Digest-only stamps
 
-Observations do not embed the full per-file graph manifest -- for a large repository
-that would be hundreds of megabytes per stamp. Instead each observation carries a
+Observations do not embed the full per-file graph manifest, because for a large
+repository that would be hundreds of megabytes per stamp. Instead each observation carries a
 compact summary: a schema tag, the manifest digest, a file count, a byte total, an
 excluded-volatile-path count, an excluded-volatile-paths digest, and a content digest.
 Seals cite their evidence by digest rather than restating it: the seal observation
@@ -385,7 +385,7 @@ labels untouched:
   checked-in `scenario_id -> classification` mapping whose values must be one of
   `{product_correct_soft_attention, partial_precision_issue, true_inaccuracy}`. A
   benign near-block that is not in the mapping defaults to `true_inaccuracy` and sets a
-  fail-loud hard stop -- an unexplained benign near-block must be reviewed, never
+  fail-loud hard stop, because an unexplained benign near-block must be reviewed, never
   silently absorbed.
 
 The verdict semantics are recorded verbatim in the bundle: pass means no meaningful
@@ -624,6 +624,11 @@ A stranger reimplementing merge-trust prereg v1 must:
 13. Confirm a rerun is bit-identical and passes the standalone verifier that ships with
     this spec.
 
+`make_example_bundle.py` in this repository writes a synthetic bundle of the section 11
+shape that the verifier accepts. It carries no measured result and is not evidence about
+Kin, but it is a working reference for the four-file layout, the section 2 digests, and
+the section 8.1 arithmetic while you build step 12.
+
 ---
 
 ## 14. Protocol details confirmed against the reference implementation
@@ -639,7 +644,7 @@ section carries no measured result figures, only mechanism.
   (its path and file digest), the daemon's and the CLI's self-reported build identifiers
   read back from the running graph, and the daemon behavior-environment captured at
   bootstrap (the cold-cache and embedding pins that determine how it answers). For Arm G
-  the object is empty -- the deterministic text arm attests no runtime. For Arm L it is
+  the object is empty, since the deterministic text arm attests no runtime. For Arm L it is
   the resolved model-configuration identity together with the attested served-model
   runtime identity.
 - `artifact_set_sha256` in the arm-artifacts manifest is the identity digest (section
@@ -650,12 +655,12 @@ section carries no measured result figures, only mechanism.
   not part of the hashed input, and the verifier recomputes the digest over the entry
   list to check it.
 - `stamp_payload_sha256` is the identity digest (section 2.1) of the entire per-arm v2
-  stamp object -- its schema tag, stamp mode and attribution, the protocol and harness
+  stamp object: its schema tag, stamp mode and attribution, the protocol and harness
   commit, the run and segment identifiers, the produced/written/recorded timestamps, the
   scenario id and arm, the binary set and its per-binary digests, the command,
   environment, harness-source manifest, source-control block, model runtime,
   runtime-identity attestation, hygiene block, platform, and dataset block and digest,
-  plus the embedded artifacts manifest -- with only the `stamp_payload_sha256` field
+  plus the embedded artifacts manifest, with only the `stamp_payload_sha256` field
   itself excluded, because it is computed before being inserted. The stamp is then
   persisted with that payload digest embedded, and the ledger's `stamp_sha256` is the file
   digest (section 2.4) of the persisted stamp bytes. The two digests therefore nest: the

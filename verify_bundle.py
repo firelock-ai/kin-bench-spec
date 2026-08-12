@@ -5,13 +5,14 @@ Stdlib only. No kin, no daemon, no network, no third-party packages. Given a bun
 directory (verdict.json, provenance.json, segments.json, decisions.jsonl) it:
 
   (a) validates the presence and shape of each artifact,
-  (b) recomputes every digest that is checkable from the bundle alone
-      (segment-ledger content digest, harness-source-manifest content digest, and
-      -- when the dataset file is supplied with --dataset -- both dataset digests),
+  (b) recomputes every digest that is checkable from the bundle alone: the
+      segment-ledger content digest, the harness-source-manifest content digest, and
+      both dataset digests when the dataset file is supplied with --dataset,
   (c) checks internal consistency (scenario/stamp counts agree across files, the
-      determinism block is coherent, confusion-matrix arithmetic reproduces the
-      declared metrics, and the per-arm decisions reconcile with the score block
-      without needing gold labels),
+      determinism block is coherent, the frozen verdict vocabulary holds and each
+      flag follows its verdict, confusion-matrix arithmetic reproduces the declared
+      metrics, and the per-arm decisions reconcile with the score block without
+      needing gold labels),
   (d) prints a PASS/FAIL report with one line per check, or --json.
 
 It is deliberately conservative: anything it cannot recompute from the bundle is
@@ -29,7 +30,7 @@ import hashlib
 import json
 import os
 import sys
-from typing import Any, Optional
+from typing import Any, Iterator, Optional, Tuple
 
 PASS = "PASS"
 FAIL = "FAIL"
@@ -55,8 +56,8 @@ def canonical_digest(obj: Any) -> str:
 def dataset_records_digest(records: list) -> str:
     """Dataset records digest: sha256 over json.dumps(records, sort_keys=True).
 
-    NOTE: default separators (", ", ": ") -- NOT the compact form used by
-    canonical_digest -- and order-sensitive over the record list.
+    NOTE: default separators (", ", ": "), NOT the compact form used by
+    canonical_digest, and order-sensitive over the record list.
     """
     return hashlib.sha256(json.dumps(list(records), sort_keys=True).encode()).hexdigest()
 
@@ -236,30 +237,85 @@ def check_decisions_shape(rep: Report, decs: Any) -> None:
                 f"{len(decs)} records, each with arm/flag/scenario_id/verdict")
 
 
-def check_sha_fields(rep: Report, prov: Any, segs: Any) -> None:
-    """Every declared *_sha256 field must be a canonical 64-hex digest."""
+def check_decision_vocabulary(rep: Report, decs: Any) -> None:
+    """Spec section 5.1 freezes the verdict vocabulary and ties flag to it: flag is
+    true exactly when the verdict is needs_attention or would_block. Both are
+    checkable from decisions.jsonl alone and neither needs a gold label.
+
+    Section 5.4 carves out one case. When every Arm L pass fails to parse, the arm
+    records an explicit parse_failure with a null verdict and a null flag rather than
+    defaulting, so those rows are excluded here and counted out loud instead. Scoring
+    excludes them too, which is why they do not disturb the decision-to-score
+    reconciliation either.
+    """
+    if not isinstance(decs, list):
+        rep.add(SKIP, "decisions:vocabulary", "decisions.jsonl absent")
+        return
+    rows = [d for d in decs if isinstance(d, dict)]
+    failed = [d for d in rows if d.get("parse_failure")]
+    scored = [d for d in rows if not d.get("parse_failure")]
+    if failed:
+        rep.add(INFO, "decisions:parse-failures",
+                f"{len(failed)} record(s) declare parse_failure and are excluded from "
+                "the vocabulary checks below")
+
+    allowed = {"pass", "needs_attention", "would_block"}
+    stray = sorted({str(d.get("verdict")) for d in scored if d.get("verdict") not in allowed})
+    if stray:
+        rep.add(FAIL, "decisions:vocabulary", f"verdict(s) outside the frozen set: {stray[:6]}")
+    else:
+        rep.add(PASS, "decisions:vocabulary", f"every verdict is one of {sorted(allowed)}")
+
+    mismatched = [d.get("scenario_id") for d in scored
+                  if d.get("flag") is not (d.get("verdict") in ("needs_attention", "would_block"))]
+    if mismatched:
+        rep.add(FAIL, "decisions:flag-follows-verdict",
+                f"{len(mismatched)} record(s) whose flag contradicts their verdict: "
+                f"{sorted(str(s) for s in mismatched)[:3]}")
+    else:
+        rep.add(PASS, "decisions:flag-follows-verdict",
+                "flag is true exactly on needs_attention and would_block")
+
+
+def _walk_digest_fields(obj: Any, path: str = "") -> Iterator[Tuple[str, Any]]:
+    """Yield (json_path, value) for every key whose name ends in sha256, at any depth."""
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            here = f"{path}.{key}" if path else str(key)
+            if str(key).endswith("sha256"):
+                yield here, value
+            else:
+                yield from _walk_digest_fields(value, here)
+    elif isinstance(obj, list):
+        for i, value in enumerate(obj):
+            yield from _walk_digest_fields(value, f"{path}[{i}]")
+
+
+def check_sha_fields(rep: Report, prov: Any, verd: Any, segs: Any) -> None:
+    """Every declared *_sha256 field must be a canonical 64-hex digest.
+
+    The walk is recursive, so binary pins, per-file manifest entries, stamp digests,
+    and identity digests are all judged, not only the handful the earlier checks
+    recompute. A null is skipped rather than failed: section 4 has the runner carry
+    an older sidecar's absent digests through as null, so null means "not declared"
+    and an absent required field is already a shape failure.
+    """
     offenders = []
-    if isinstance(prov, dict):
-        ds = prov.get("dataset") or {}
-        for k in ("sha256", "raw_file_sha256"):
-            if k in ds and not is_canonical_sha256(ds[k]):
-                offenders.append(f"dataset.{k}")
-        man = prov.get("harness_source_manifest") or {}
-        if not is_canonical_sha256(man.get("content_sha256")):
-            offenders.append("harness_source_manifest.content_sha256")
-    if isinstance(segs, dict):
-        if not is_canonical_sha256(segs.get("content_sha256")):
-            offenders.append("segments.content_sha256")
-        for i, seg in enumerate(segs.get("segments") or []):
-            for w in seg.get("arm_writes") or []:
-                for k in ("identity_sha256", "stamp_sha256", "artifact_set_sha256"):
-                    if not is_canonical_sha256(w.get(k)):
-                        offenders.append(f"segments[{i}].arm_writes[{w.get('scenario_id')}/{w.get('arm')}].{k}")
+    seen = set()
+    for label, root in (("provenance", prov), ("verdict", verd), ("segments", segs)):
+        if not isinstance(root, (dict, list)):
+            continue
+        for path, value in _walk_digest_fields(root, label):
+            if value is None or path in seen:
+                continue
+            seen.add(path)
+            if not is_canonical_sha256(value):
+                offenders.append(path)
     if offenders:
-        rep.add(FAIL, "sha256:format", f"non-canonical digest field(s): {offenders[:6]}"
+        rep.add(FAIL, "sha256:format", f"non-canonical digest field(s): {sorted(offenders)[:6]}"
                 + (" ..." if len(offenders) > 6 else ""))
     else:
-        rep.add(PASS, "sha256:format", "all declared *_sha256 fields are 64-hex")
+        rep.add(PASS, "sha256:format", f"all {len(seen)} declared *_sha256 fields are 64-hex")
 
 
 def check_ledger_digest(rep: Report, verd: Any, segs: Any) -> None:
@@ -330,7 +386,7 @@ def check_dataset_digest(rep: Report, prov: Any, verd: Any, dataset_path: Option
         return
     if not dataset_path:
         rep.add(INFO, "digest:dataset",
-                "declared (not recomputed) -- pass --dataset PATH to recompute "
+                "declared (not recomputed); pass --dataset PATH to recompute "
                 f"sha256={str(decl.get('sha256'))[:12]}...")
         return
     if not os.path.isfile(dataset_path):
@@ -400,21 +456,32 @@ def check_cross_file_agreement(rep: Report, prov: Any, verd: Any, segs: Any) -> 
     elif present:
         rep.add(FAIL, "cross:run_id", f"disagree: {present}")
 
-    # protocol_commit == source_control head/expected == segment harness_commit
+    # protocol_commit == source_control head/expected == segment harness_commit.
+    # A binding needs something to bind to: when none of the corroborating fields is
+    # present there is nothing to agree with protocol_commit, and reporting agreement
+    # would be a pass that cannot fail.
     if isinstance(prov, dict):
         pc = prov.get("protocol_commit")
         sc = prov.get("source_control") or {}
-        chain = {"protocol_commit": pc, "sc.head": sc.get("head"),
-                 "sc.expected_commit": sc.get("expected_commit")}
+        corroborators = {"sc.head": sc.get("head"),
+                         "sc.expected_commit": sc.get("expected_commit")}
         if isinstance(segs, dict):
             hcs = {seg.get("harness_commit") for seg in (segs.get("segments") or [])}
             if len(hcs) == 1:
-                chain["segment.harness_commit"] = next(iter(hcs))
-        vals = {v for v in chain.values() if v is not None}
+                corroborators["segment.harness_commit"] = next(iter(hcs))
         if not is_git_sha(pc):
             rep.add(WARN, "cross:protocol_commit-format", f"protocol_commit not a 40-hex git sha: {pc}")
-        if len(vals) <= 1:
-            rep.add(PASS, "cross:commit-chain", f"protocol_commit binds source-control + ledger ({str(pc)[:12]})")
+        present = {k: v for k, v in corroborators.items() if v is not None}
+        chain = dict(present, protocol_commit=pc)
+        if pc is None:
+            rep.add(FAIL, "cross:commit-chain", "protocol_commit absent, nothing to bind")
+        elif not present:
+            rep.add(FAIL, "cross:commit-chain",
+                    "protocol_commit is uncorroborated: no source-control head or "
+                    f"expected commit and no ledger harness_commit ({sorted(corroborators)})")
+        elif len(set(chain.values())) == 1:
+            rep.add(PASS, "cross:commit-chain",
+                    f"protocol_commit {str(pc)[:12]} agrees with {sorted(present)}")
         else:
             rep.add(FAIL, "cross:commit-chain", f"commit mismatch: {chain}")
 
@@ -766,7 +833,8 @@ def verify(bundle_dir: str, dataset_path: Optional[str] = None) -> Report:
     check_verdict_shape(rep, verd)
     check_segments_shape(rep, segs)
     check_decisions_shape(rep, decs)
-    check_sha_fields(rep, prov, segs)
+    check_decision_vocabulary(rep, decs)
+    check_sha_fields(rep, prov, verd, segs)
     check_ledger_digest(rep, verd, segs)
     check_harness_manifest_digest(rep, prov)
     check_dataset_digest(rep, prov, verd, dataset_path)
