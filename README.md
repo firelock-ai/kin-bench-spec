@@ -58,8 +58,7 @@ which.
 | `verdict.provenance_gate.ledger` `content_sha256` | Recomputes it, and requires the embedded ledger to equal `segments.json` |
 | `harness_source_manifest.content_sha256` | Recomputes it over the schema, file list, and tool list |
 | `dataset.sha256`, `dataset.raw_file_sha256` | Recomputes both from the dataset file when you pass `--dataset`, otherwise reports them as declared |
-| Every other `*_sha256` field, at any depth | Checks it is 64 lowercase hex, including the binary pins and the per-stamp digests |
-| `identity_sha256`, `stamp_sha256`, `artifact_set_sha256`, `common_identity_sha256` | Format only. Recomputing these needs the per-scenario artifact tree, which is not part of the four-file bundle |
+| Every other `*_sha256` field, at any depth | Checked to be 64 lowercase hex. That covers the binary pins and the `identity`, `stamp`, and `artifact_set` digests, none of which can be recomputed without the per-scenario artifact tree the four-file bundle does not carry |
 | Counts, determinism block, confusion arithmetic, decisions, paired statistics | Recomputed and cross-checked internally, with no gold label required |
 
 Concretely, the internal consistency checks confirm that scenario and stamp counts agree
