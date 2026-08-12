@@ -20,14 +20,138 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - name: Compile and self-describe
         run: |
-          python3 -m py_compile verify_bundle.py
+          python3 -m py_compile verify_bundle.py make_example_bundle.py
           python3 verify_bundle.py --help >/dev/null
+          python3 make_example_bundle.py --help >/dev/null
       - name: Refuse a missing bundle (fail-closed smoke)
         run: |
           if python3 verify_bundle.py ./does-not-exist >/dev/null 2>&1; then
             echo "::error::verifier accepted a missing bundle"; exit 1
           fi
           echo "verifier fails closed on a missing bundle"
-      - name: Docs are ASCII and link-clean
+
+      # The steps above can only catch a verifier that fails to start. Everything
+      # below runs it against a real bundle, so a change that broke acceptance,
+      # a digest primitive, or the confusion arithmetic turns this job red.
+      - name: Accept a well-formed bundle
         run: |
-          ! LC_ALL=C grep -rnP '[^\x00-\x7F]' README.md SPEC.md TRANSPARENCY.md NOTICE LICENSE
+          set -euo pipefail
+          python3 make_example_bundle.py example-out
+          python3 verify_bundle.py example-out/bundle \
+            --dataset example-out/dataset.jsonl | tee accept.log
+          grep -q "RESULT: PASS" accept.log
+          if grep -q "\[FAIL\]" accept.log; then
+            echo "::error::verifier reported a failing check on the example bundle"; exit 1
+          fi
+          if grep -q "\[WARN\]" accept.log; then
+            echo "::error::the example bundle is meant to be warning-free"; exit 1
+          fi
+          if grep -q "\[SKIP\]" accept.log; then
+            echo "::error::a check was skipped; the example bundle should exercise all of them"; exit 1
+          fi
+      - name: Regenerate deterministically
+        run: |
+          set -euo pipefail
+          python3 make_example_bundle.py example-again
+          diff -r example-out example-again
+          echo "generator output is byte-identical across runs"
+      - name: Reject tampered bundles (proves the accept step is not a no-op)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, shutil, subprocess, sys
+
+          def tamper(name, fn):
+              dst = os.path.join("tampered", name)
+              shutil.rmtree(dst, ignore_errors=True)
+              shutil.copytree("example-out/bundle", dst)
+              fn(dst)
+              return dst
+
+          def load(path):
+              with open(path) as fh:
+                  return json.load(fh)
+
+          def store(path, obj):
+              with open(path, "w") as fh:
+                  json.dump(obj, fh, indent=2, sort_keys=True)
+
+          def break_ledger_digest(d):
+              segs = load(os.path.join(d, "segments.json"))
+              segs["content_sha256"] = "0" * 64  # well-formed, wrong value
+              store(os.path.join(d, "segments.json"), segs)
+
+          def break_metric(d):
+              verd = load(os.path.join(d, "verdict.json"))
+              verd["scores"]["k"]["flag"]["precision"] = 0.99
+              store(os.path.join(d, "verdict.json"), verd)
+
+          def break_decision_link(d):
+              path = os.path.join(d, "decisions.jsonl")
+              rows = [json.loads(l) for l in open(path) if l.strip()]
+              rows[0]["verdict"] = "pass"
+              rows[0]["flag"] = False
+              with open(path, "w") as fh:
+                  for r in rows:
+                      fh.write(json.dumps(r, sort_keys=True) + "\n")
+
+          def break_verdict_vocabulary(d):
+              path = os.path.join(d, "decisions.jsonl")
+              rows = [json.loads(l) for l in open(path) if l.strip()]
+              rows[0]["verdict"] = "looks_fine_to_me"
+              rows[0]["flag"] = False
+              with open(path, "w") as fh:
+                  for r in rows:
+                      fh.write(json.dumps(r, sort_keys=True) + "\n")
+
+          def break_commit_chain(d):
+              prov = load(os.path.join(d, "provenance.json"))
+              prov["source_control"]["head"] = "f" * 40
+              store(os.path.join(d, "provenance.json"), prov)
+
+          cases = [
+              ("ledger-digest", break_ledger_digest, "digest:segments.content_sha256"),
+              ("metric", break_metric, "score:scores.k.flag"),
+              ("decision-link", break_decision_link, "link:k.flag"),
+              ("vocabulary", break_verdict_vocabulary, "decisions:vocabulary"),
+              ("commit-chain", break_commit_chain, "cross:commit-chain"),
+          ]
+
+          failures = []
+          for name, fn, expected in cases:
+              d = tamper(name, fn)
+              proc = subprocess.run([sys.executable, "verify_bundle.py", d],
+                                    capture_output=True, text=True)
+              if proc.returncode == 0:
+                  failures.append(f"{name}: verifier accepted a tampered bundle")
+                  continue
+              if "RESULT: FAIL" not in proc.stdout:
+                  failures.append(f"{name}: no FAIL verdict in the report")
+              if expected not in proc.stdout:
+                  failures.append(f"{name}: expected check {expected} did not fail")
+              print(f"  rejected {name} (exit {proc.returncode})")
+
+          # A tampered dataset must be caught only when the dataset is supplied.
+          shutil.copy("example-out/dataset.jsonl", "tampered/dataset-mutated.jsonl")
+          with open("tampered/dataset-mutated.jsonl", "a") as fh:
+              fh.write(json.dumps({"scenario_id": "extra"}, sort_keys=True) + "\n")
+          proc = subprocess.run([sys.executable, "verify_bundle.py", "example-out/bundle",
+                                 "--dataset", "tampered/dataset-mutated.jsonl"],
+                                capture_output=True, text=True)
+          if proc.returncode == 0 or "digest:dataset.sha256" not in proc.stdout:
+              failures.append("dataset: a mutated dataset file was not caught")
+          else:
+              print("  rejected dataset mutation")
+
+          if failures:
+              for f in failures:
+                  print(f"::error::{f}")
+              raise SystemExit(1)
+          print("every tampered bundle was rejected")
+          PY
+
+      - name: Docs and sources are ASCII
+        run: |
+          ! LC_ALL=C grep -rnP '[^\x00-\x7F]' \
+            README.md SPEC.md TRANSPARENCY.md NOTICE LICENSE \
+            verify_bundle.py make_example_bundle.py
