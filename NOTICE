@@ -5,5 +5,6 @@ Licensed under the Apache License, Version 2.0 (the "License").
 See the LICENSE file for the specific language governing permissions
 and limitations under the License.
 
-The verifier (verify_bundle.py) depends only on the Python standard
-library and includes no third-party components.
+The verifier (verify_bundle.py) and the example-bundle generator
+(make_example_bundle.py) depend only on the Python standard library
+and include no third-party components.

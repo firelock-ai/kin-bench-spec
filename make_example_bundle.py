@@ -24,7 +24,6 @@ import argparse
 import hashlib
 import json
 import os
-import sys
 
 PROTOCOL = "merge-trust-prereg-v1"
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
