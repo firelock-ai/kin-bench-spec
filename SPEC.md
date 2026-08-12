@@ -39,6 +39,37 @@ difference between arms is attributable to substrate, not to task framing. The
 headline comparison is the scenario-paired K-vs-G contrast; K-vs-L is a companion
 contrast when Arm L is run.
 
+### 1.1 Why task framing cannot differ on the headline contrast
+
+"Attributable to substrate, not to task framing" is the claim a reader should be
+most suspicious of, because on most AI benchmarks it rests on the authors having
+written comparable prompts. Here it does not rest on judgement at all, and the
+reason is worth stating plainly so it can be checked rather than trusted.
+
+Neither arm in the headline contrast is a prompted agent.
+
+- Arm K is a command. It runs the system under test and reads its output. There
+  is no prompt to write, tune, or bias.
+- Arm G is a deterministic rule over text. It takes no natural-language input and
+  produces the same answer for the same input every time.
+
+So on K-vs-G there is no prompt on either side, and prompt asymmetry is not
+something the protocol forbids, it is something the design makes impossible. An
+implementer checking this does not have to compare wordings; they can confirm
+that neither arm accepts prompt text at all.
+
+Arm L is the only prompted arm, and it is a companion baseline rather than the
+headline. Its prompt is frozen: a single archived system prompt file, loaded
+verbatim, identical across every scenario and every pass, and hashed into the run's
+source manifest with everything else. The same prompt text governs every scenario,
+so it cannot be varied per scenario, per arm, or per run without changing a
+published digest.
+
+A conforming implementation must preserve this property. If an implementation
+introduces per-scenario or per-arm prompt construction on any arm, it is no longer
+measuring the same thing this spec describes, and results from it are not
+comparable to results produced under this spec.
+
 ---
 
 ## 2. Hashing primitives (pin these first)
