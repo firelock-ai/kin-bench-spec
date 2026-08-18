@@ -105,3 +105,14 @@ declared actors, content-addressed identifiers, and reproducible reruns.
 | [`make_example_bundle.py`](make_example_bundle.py) | Writes the synthetic example bundle used above. No measured result. |
 | [`TRANSPARENCY.md`](TRANSPARENCY.md) | Why the specification and verifier are open while the runner stays private. |
 | [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) | Apache License 2.0, and the attribution notice it requires. |
+
+## Ecosystem
+
+| Repo | Role |
+|---|---|
+| [kin](https://github.com/firelock-ai/kin) | The system of record for AI-written software, and the subject of this benchmark |
+| [kinlab](https://kinlab.ai) | Hosted collaboration and control plane |
+
+## License
+
+[Apache-2.0](LICENSE).
