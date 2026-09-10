@@ -110,7 +110,7 @@ declared actors, content-addressed identifiers, and reproducible reruns.
 
 | Repo | Role |
 |---|---|
-| [kin](https://github.com/firelock-ai/kin) | The system of record for AI-written software, and the subject of this benchmark |
+| [kin](https://github.com/firelock-ai/kin) | Semantic system of record, and the subject of this benchmark |
 | [kinlab](https://kinlab.ai) | Hosted collaboration and control plane |
 
 ## License
